@@ -376,6 +376,54 @@ render_ocr_pdf() {
     printf -- '- Corrected troubleshooting flowchart entry: `SELF-TEST IN`, `START OUT`, `STOP OUT`, `CLOCK OUT`, `HOLD OUT`.\n'
     printf -- '- Corrected signature references include at least Table 8-1 test-point values and multiple Table 8-2 NORMAL/SERVICE entries.\n'
     printf -- '- Corrected connector references on the main board and pod matter when tracing wiring or comparing boards to the schematic.\n\n'
+    printf '### Verified Tables\n\n'
+    printf 'These tables were manually verified against the rendered page images and should be preferred over raw OCR when the same data appears below.\n\n'
+    printf '#### Verified Core Specifications\n\n'
+    printf '| Area | Verified Values |\n'
+    printf '| --- | --- |\n'
+    printf '| Display characters | `0 1 2 3 4 5 6 7 8 9 A C F H P U` |\n'
+    printf '| Indicator stretch | `GATE` / `UNSTABLE SIGNATURE`: `100 ms`; probe pulse stretch: `50 ms`; minimum pulse width: `10 ns` |\n'
+    printf '| Classification probability | Correct stream as correct: `100%%`; faulty stream as faulty: `99.998%%` |\n'
+    printf '| Minimum gate timing | Minimum gate length: `1 clock cycle`; minimum timing from last `STOP` to next `START`: `1 clock cycle` |\n'
+    printf '| Data probe input | Input impedance: `50 KΩ to 1.4 V`, nominal; shunted by `7 pF`, nominal |\n'
+    printf '| Original data probe thresholds | Logic one: `2.0 V +0.2/-0.3`; logic zero: `0.8 V +0.3/-0.2` |\n'
+    printf '| Data probe timing | Setup time: `15 ns` with `0.2 V` overdrive; hold time: `0 ns` |\n'
+    printf '| START/STOP/CLOCK inputs | Input impedance: `50 KΩ to 1.4 V`, nominal; shunted by `7 pF`; threshold: `1.4 V ±0.6` with about `0.1 V` hysteresis |\n'
+    printf '| START/STOP timing | Setup time: `25 ns`; hold time: `0 ns` |\n'
+    printf '| Clock input | Maximum clock frequency: `10 MHz`; minimum high or low state time: `50 ns` |\n'
+    printf '| Overload protection | All inputs: `±150 V continuous`, `±250 V intermittent`, `250 V ac for 1 minute` |\n'
+    printf '| Operating environment | `0–55 °C`, `95%% RH at 40 °C`, altitude `4,600 m` |\n'
+    printf '| Line power options | Option `100`: `100 V ac +5%%/-10%% 48–440 Hz`; Option `120`: `120 V ac +5%%/-10%% 48–440 Hz`; Option `220`: `220 V ac +5%%/-10%% 48–66 Hz`; Option `240`: `240 V ac +5%%/-10%% 48–66 Hz` |\n'
+    printf '| Physical | Net weight `2.5 kg / 5.5 lb`; shipping `7.7 kg / 17 lb`; size `90 mm x 215 mm x 300 mm` excluding tilt bale, probes, and pouch |\n\n'
+    printf '#### Verified Recommended Test Equipment\n\n'
+    printf '| Instrument | Critical Specs | Recommended HP Model |\n'
+    printf '| --- | --- | --- |\n'
+    printf '| Pulse Generator | `5 ns–100 ns` delay | `8007B` |\n'
+    printf '| Pulse Generator | `10 MHz`, `5 V` pulse | `8013B` |\n'
+    printf '| Oscilloscope with dual-trace vertical amplifier | `100 MHz` | `182C`, `1805A/1825A` |\n'
+    printf '| Power Supply | `5 V` | `6111A` |\n'
+    printf '| Digital Voltmeter | `10 V` | `3476A` |\n'
+    printf '| Resistor | `1000 Ω 5%% 1/4 W` | `0683-1025` |\n'
+    printf '| Resistor | `50 Ω 5%% 2 W` | `0698-3311` |\n'
+    printf '| Capacitor | `0.1 µF ±20%% 25 V` | `0170-0022` |\n'
+    printf '| Capacitor | `10 µF +75/-10%% 25 V` | `0180-0059` |\n'
+    printf '| Logic Probe | `TTL compatibility` | `545A` |\n'
+    printf '| Logic Pulser | `TTL compatibility` | `546A` |\n'
+    printf '| Logic Current Tracer | `1 mA–1 A range` | `547A` |\n\n'
+    printf '#### Verified Corrected Threshold and Test Limits\n\n'
+    printf '| Item | Verified Corrected Value |\n'
+    printf '| --- | --- |\n'
+    printf '| Data probe threshold, logic one | `2.0 V +0.1/-0.4 V` |\n'
+    printf '| Data probe threshold, logic zero | `0.8 V +0.4/-0.0 V` |\n'
+    printf '| Logic-level performance test, dim transition | `0.8 V +0.4/-0.0 V` |\n'
+    printf '| Performance record, probe light dim | Min `+0.8 V`; Max `+1.2 V` |\n'
+    printf '| Performance record, probe light bright | Min `+1.6 V`; Max `+2.1 V` |\n\n'
+    printf '#### Verified Troubleshooting Corrections\n\n'
+    printf '| Reference | Verified Correction |\n'
+    printf '| --- | --- |\n'
+    printf '| Flowchart preliminary step | `SELF-TEST IN`; `START OUT`; `STOP OUT`; `CLOCK OUT`; `HOLD OUT` |\n'
+    printf '| Table 8-1 correction | Test Point `4`, `NORMAL` signature = `A446` |\n'
+    printf '| Table 8-1 correction | Test Point `7`, `SERVICE` signature = `GP6F` |\n\n'
     printf '### Trust Policy\n\n'
     printf -- '- Trust prose paragraphs, operating steps, and high-level theory sections as generally usable OCR.\n'
     printf -- '- Be cautious with front-panel artwork, flowcharts, schematic pages, component locator pages, and signature tables.\n'
@@ -449,8 +497,9 @@ This folder is organized so an agent can answer HP 5004A usage, calibration, and
 - High-value sections:
   - `Section III`: operating instructions, self-test, and measurement workflow
   - `Section IV`: performance tests
-  - `Section V`: adjustments and service checks
-  - `Section VI`: parts, schematics, and reference drawings
+  - `Section VII`: manual changes and verified corrections
+  - `Section VIII`: troubleshooting, disassembly, theory, and schematics
+  - `Verified Tables` near the top of the Markdown for fast trusted lookup
 - Figures: `docs-classified/service/05004-90001/figures/`
 
 ## Agent Usage Rules

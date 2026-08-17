@@ -19,8 +19,9 @@ This folder is organized so an agent can answer HP 5004A usage, calibration, and
 - High-value sections:
   - `Section III`: operating instructions, self-test, and measurement workflow
   - `Section IV`: performance tests
-  - `Section V`: adjustments and service checks
-  - `Section VI`: parts, schematics, and reference drawings
+  - `Section VII`: manual changes and verified corrections
+  - `Section VIII`: troubleshooting, disassembly, theory, and schematics
+  - `Verified Tables` near the top of the Markdown for fast trusted lookup
 - Figures: `docs-classified/service/05004-90001/figures/`
 
 ## Agent Usage Rules
