@@ -33,6 +33,18 @@ normalize_ocr_text() {
       return s
     }
 
+    function alpha_count(s, t) {
+      t = s
+      gsub(/[^A-Za-z]/, "", t)
+      return length(t)
+    }
+
+    function digit_count(s, t) {
+      t = s
+      gsub(/[^0-9]/, "", t)
+      return length(t)
+    }
+
     function is_cover_page() {
       return page_nonempty <= 8 && seen_5004a && seen_signature && seen_analyzer
     }
@@ -52,6 +64,34 @@ normalize_ocr_text() {
       if (line ~ /^HP Model 5004A$/) return 1
       if (line ~ /^Page [0-9]+ HP Model 5004A$/) return 1
       if (line ~ /^[ivxlcdm]+\.?$/) return 1
+      return 0
+    }
+
+    function is_obvious_ocr_garbage(line, compact, letters, digits) {
+      compact = line
+      gsub(/[[:space:]]+/, "", compact)
+      letters = alpha_count(compact)
+      digits = digit_count(compact)
+
+      if (line ~ /^Figure [0-9-]+\./) return 0
+      if (line ~ /^Table [0-9-]+\./) return 0
+      if (line ~ /^## Page /) return 0
+      if (line ~ /^### SECTION /) return 0
+      if (line ~ /^[0-9]+-[0-9]+\./) return 0
+      if (line ~ /^[A-Z][A-Z0-9 ,()\/.-]+:$/) return 0
+      if (line ~ /^(WARNING|CAUTION|NOTE|GENERAL|OPERATION|SERVICE)$/) return 0
+      if (line ~ /^(START|STOP|CLOCK|GATE|SELF-TEST|HOLD|LINE|PROBE)([[:space:][:punct:]].*)?$/) return 0
+
+      if (compact == "") return 0
+      if (compact ~ /^[[:punct:][:digit:]]+$/ && length(compact) <= 10) return 1
+      if (line ~ /^[A-Za-z]?[[:space:]]*[_=-][[:space:]]*[A-Za-z]{0,4}$/) return 1
+      if (line ~ /^[[:space:][:punct:]]*[A-Za-z]{1,3}[[:space:][:punct:]]*$/ && letters <= 3) return 1
+      if (line ~ /[~_^|\\<>]/ && letters <= 6) return 1
+      if (line ~ /[\/\\]/ && letters <= 4 && digits <= 2) return 1
+      if (line ~ /[=|]/ && letters <= 5 && digits <= 3) return 1
+      if (page_kind != "plain" && letters <= 5 && digits <= 3 && line !~ /[.:]/) return 1
+      if (page_kind != "plain" && line ~ /^[[:space:][:punct:]A-Za-z0-9]+$/ && letters <= 3 && digits <= 2) return 1
+
       return 0
     }
 
@@ -122,6 +162,9 @@ normalize_ocr_text() {
         return
       }
 
+      print page_header
+      print ""
+
       if (is_navigation_page()) {
         print "[table of contents and list pages omitted; use the Diagnostic Navigation summary above for fast access]"
         print ""
@@ -147,6 +190,10 @@ normalize_ocr_text() {
         blank_count = 0
 
         if (is_running_noise(line)) {
+          continue
+        }
+
+        if (is_obvious_ocr_garbage(line)) {
           continue
         }
 
@@ -198,8 +245,7 @@ normalize_ocr_text() {
     /^## Page [0-9]+$/ {
       flush_page()
       in_page = 1
-      print $0
-      print ""
+      page_header = $0
       next
     }
 
@@ -217,7 +263,6 @@ normalize_ocr_text() {
 render_ocr_pdf() {
   local src="$1"
   local out="$2"
-  local text_out="${out%.md}.txt"
   local title="$3"
   local category="$4"
   local printed="$5"
@@ -250,28 +295,81 @@ render_ocr_pdf() {
     printf -- '- Notes: %s\n\n' "$notes"
     printf '## Agent Notes\n\n'
     printf 'This manual is scan-heavy. Use the OCR text for search and rough citation, but verify equations, front-panel legends, pin numbers, thresholds, and timing references against the rendered page images when the wording looks suspicious.\n\n'
+    printf '## Trusted Working Notes\n\n'
+    printf 'These notes are curated for agent use and should be preferred over raw OCR when they cover the same material.\n\n'
+    printf '### Instrument Model\n\n'
+    printf -- '- The 5004A is a signature analyzer for compatible digital logic systems, not a general-purpose waveform viewer.\n'
+    printf -- '- It observes a DUT data stream during a gated time window and compresses that stream into a 4-character signature.\n'
+    printf -- '- Correct use requires known-good signatures from the DUT manual or service reference.\n'
+    printf -- '- If the DUT is not designed for signature analysis, the 5004A cannot produce meaningful diagnostic answers by itself.\n\n'
+    printf '### Self-Test Interpretation\n\n'
+    printf -- '- SELF-TEST is the first trust gate: do not trust DUT diagnosis until the analyzer passes it.\n'
+    printf -- '- In SELF-TEST, the pod START/STOP/CLOCK leads are looped to the front-panel test receptacles and the data probe is inserted into the `PROBE TEST` connector.\n'
+    printf -- '- Expected behavior is a brief all-segments display followed by repeating known signatures; the OCR around exact glyphs is noisy, so verify exact displayed characters against the page image when needed.\n'
+    printf -- '- If LEDs, the `GATE` lamp, the probe-tip lamp, or the 4-digit display do not behave as expected during SELF-TEST, troubleshoot the analyzer before touching a DUT.\n'
+    printf -- '- The manual-change section corrects the troubleshooting flow entry conditions for SELF-TEST-driven diagnosis and should override older flowchart wording.\n\n'
+    printf '### Diagnostic Workflow\n\n'
+    printf -- '- First verify the analyzer itself with the built-in SELF-TEST before trusting any DUT result.\n'
+    printf -- '- Then connect `START`, `STOP`, `CLOCK`, and `GND` from the gating pod to the DUT points named in the DUT manual.\n'
+    printf -- '- Set the START/STOP/CLOCK edge-select switches to match the intended active edge from the DUT procedure.\n'
+    printf -- '- Probe DUT signature nodes and compare displayed signatures against the known-good values from the DUT documentation.\n'
+    printf -- '- If most or all signatures are wrong, suspect setup, gating polarity, clocking, or reference-signature mismatch before assuming multiple hardware faults.\n'
+    printf -- '- When clocking is slow, ignore the first transient reading and trust repeated identical signatures.\n\n'
+    printf '### Control Semantics\n\n'
+    printf '| Control or Indicator | Practical Meaning |\n'
+    printf '| --- | --- |\n'
+    printf '| `SELF-TEST` | Verifies the analyzer itself using its built-in test path. Run this before DUT work. |\n'
+    printf '| `HOLD` | Freezes a one-time signature so it can be read or compared. |\n'
+    printf '| `START` / `STOP` / `CLOCK` switches | Select the active edge polarity for the three gating inputs. |\n'
+    printf '| `GATE` lamp | Repetitive blinking usually means START/STOP gating is being recognized. |\n'
+    printf '| `UNSTABLE SIGNATURE` lamp | Successive signatures differ; often indicates changing input data, timing issues, or an unstable condition. |\n'
+    printf '| Probe-tip lamp | Bright=`high`, dim=`bad/mid-level`, off=`low`; short pulses are stretched so activity is visible. |\n\n'
+    printf '### Internal Operation Summary\n\n'
+    printf -- '- The gating pod receives DUT `START`, `STOP`, and `CLOCK` signals and converts them to high-speed internal levels.\n'
+    printf -- '- Edge-selection switches decide whether rising or falling transitions are treated as active control events.\n'
+    printf -- '- Gate-control logic opens a measurement window between START and STOP and drives the `GATE` indicator.\n'
+    printf -- '- The data probe classifies the measured node as high, low, or bad-level, then hands that data to the main assembly.\n'
+    printf -- '- A pseudo-random word generator reduces the captured bit stream to the displayed 4-character signature.\n'
+    printf -- '- An internal comparator checks successive signatures and lights `UNSTABLE SIGNATURE` when they do not repeat consistently.\n\n'
+    printf '### Repair Playbook\n\n'
+    printf -- '- Begin with power, fuse, and SELF-TEST status.\n'
+    printf -- '- If SELF-TEST fails broadly, use the built-in indicators first: power rails, `GATE`, display activity, and probe-tip lamp behavior.\n'
+    printf -- '- Use the NORMAL/SERVICE switch and the corrected troubleshooting flow only after basic SELF-TEST observations are known.\n'
+    printf -- '- Use Table 8-1 for major test-point direction-finding and Table 8-2 for deeper board-level checks, but treat both as image-verified sources because OCR is weak there.\n'
+    printf -- '- For internal service, combine the service prose with component locator pages and the schematic image set; do not rely on OCR alone for connector IDs or pin numbers.\n\n'
+    printf '### Manual-Change Overrides\n\n'
+    printf -- '- Treat the `MANUAL CHANGES` section as authoritative when it conflicts with earlier pages.\n'
+    printf -- '- Data-probe threshold corrections override the original specification and performance-test limits.\n'
+    printf -- '- Troubleshooting flowchart entry conditions were corrected: `SELF-TEST` must be `IN`; `START`, `STOP`, `CLOCK`, and `HOLD` must be `OUT`.\n'
+    printf -- '- Table 8-1 and Table 8-2 signature values contain known corrections; verify exact values against the corrected pages and the page images.\n'
+    printf -- '- Connector and board reference corrections in the manual-changes pages matter when following schematic or parts references.\n\n'
+    printf '### High-Value Manual Corrections\n\n'
+    printf -- '- Corrected data-probe threshold: logic one `2.0 V +0.1/-0.4`; logic zero `0.8 V +0.4/-0.0`.\n'
+    printf -- '- Corrected performance-test limits track that updated threshold and should be used instead of the original looser text.\n'
+    printf -- '- Corrected troubleshooting flowchart entry: `SELF-TEST IN`, `START OUT`, `STOP OUT`, `CLOCK OUT`, `HOLD OUT`.\n'
+    printf -- '- Corrected signature references include at least Table 8-1 test-point values and multiple Table 8-2 NORMAL/SERVICE entries.\n'
+    printf -- '- Corrected connector references on the main board and pod matter when tracing wiring or comparing boards to the schematic.\n\n'
+    printf '### Trust Policy\n\n'
+    printf -- '- Trust prose paragraphs, operating steps, and high-level theory sections as generally usable OCR.\n'
+    printf -- '- Be cautious with front-panel artwork, flowcharts, schematic pages, component locator pages, and signature tables.\n'
+    printf -- '- Never quote an exact signature value, pin number, or locator label from a page that carries an OCR warning without checking the corresponding page image.\n'
+    printf -- '- For repair work inside the instrument, combine the prose sections with the rendered figures rather than relying on OCR alone.\n\n'
     printf '## Diagnostic Navigation\n\n'
     printf -- '- `Section I`: general information, safety, specifications, serial coverage\n'
     printf -- '- `Section II`: installation, power selection, and shipment guidance\n'
     printf -- '- `Section III`: operating information, self-test, and signature-analysis workflow\n'
     printf -- '- `Section IV`: performance tests\n'
-    printf -- '- `Section V`: adjustments and service procedures\n'
-    printf -- '- `Section VI`: replaceable parts, schematics, and board-level references\n\n'
+    printf -- '- `Section V`: adjustments and line-voltage configuration\n'
+    printf -- '- `Section VI`: replaceable parts and ordering data\n'
+    printf -- '- `Section VII`: manual changes and corrections that can override earlier pages\n'
+    printf -- '- `Section VIII`: troubleshooting flow, signature tables, disassembly, theory, and schematics\n'
+    printf -- '- `Pages 44-47`: manual-change corrections worth checking before precision diagnostic work\n'
+    printf -- '- `Pages 59-62`: troubleshooting flow and signature tables; low OCR trust, high diagnostic value\n'
+    printf -- '- `Pages 68-70`: gate-control theory, data path, pseudo-random word generator, and schematic notes\n\n'
     printf '## Cleanup Notes\n\n'
     printf 'This classifier uses the cleaned PDF with the Agilent errata frontmatter removed so the working content stays focused on the original HP manual.\n\n'
     printf '## Extracted Text\n\n'
   } > "$out"
-
-  {
-    printf '%s\n\n' "$title"
-    printf 'Source PDF: %s\n' "${src#$ROOT_DIR/}"
-    printf 'Category: %s\n' "$category"
-    printf 'Printed: %s\n' "$printed"
-    printf 'Pages: %s\n' "$pages"
-    printf 'Conversion: pdftoppm + tesseract OCR with page markers\n'
-    printf 'Diagnostic Scope: %s\n' "$diag_scope"
-    printf 'Notes: %s\n\n' "$notes"
-  } > "$text_out"
 
   render_page_images "$src" "$figures_dir" 150
 
@@ -298,7 +396,6 @@ render_ocr_pdf() {
 
   normalize_ocr_text "$raw_text" "$cleaned_text"
   cat "$cleaned_text" >> "$out"
-  cat "$cleaned_text" >> "$text_out"
 }
 
 write_index() {
@@ -313,7 +410,6 @@ This folder is organized so an agent can answer HP 5004A usage, calibration, and
 ### HP 5004A Signature Analyzer Operating and Service Manual
 
 - File: `docs-classified/service/05004-90001.md`
-- Text Export: `docs-classified/service/05004-90001.txt`
 - Source PDF: `docs/05004-90001.pdf`
 - Category: `signature-analyzer-operating-service-manual`
 - Best for: operating instructions, signature-analysis setup, specification lookup, calibration guidance, circuit understanding, and repair/service context
