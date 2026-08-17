@@ -53,6 +53,10 @@ normalize_ocr_text() {
       return saw_toc || saw_list_tables || saw_list_figures
     }
 
+    function is_figure_only_page() {
+      return saw_figure_caption && !saw_paragraph_ref && !saw_section_marker && !saw_table_caption && page_nonempty <= 14
+    }
+
     function is_running_noise(line) {
       if (line == "Model 5004A") return 1
       if (line == "General Information") return 1
@@ -141,6 +145,10 @@ normalize_ocr_text() {
       saw_toc = 0
       saw_list_tables = 0
       saw_list_figures = 0
+      saw_figure_caption = 0
+      saw_table_caption = 0
+      saw_paragraph_ref = 0
+      saw_section_marker = 0
 
       for (i = 1; i <= line_count; i++) {
         line = trim(page_lines[i])
@@ -154,6 +162,10 @@ normalize_ocr_text() {
         if (line == "TABLE OF CONTENTS" || line == "TABLE OF CONTENTS (Continued)") saw_toc = 1
         if (line == "LIST OF TABLES") saw_list_tables = 1
         if (line == "LIST OF FIGURES") saw_list_figures = 1
+        if (line ~ /^Figure [0-9-]+\./) saw_figure_caption = 1
+        if (line ~ /^Table [0-9-]+\./) saw_table_caption = 1
+        if (line ~ /^[0-9]+-[0-9]+\./) saw_paragraph_ref = 1
+        if (line ~ /^SECTION [IVX]+$/) saw_section_marker = 1
       }
 
       if (is_cover_page()) {
@@ -168,6 +180,21 @@ normalize_ocr_text() {
       if (is_navigation_page()) {
         print "[table of contents and list pages omitted; use the Diagnostic Navigation summary above for fast access]"
         print ""
+        line_count = 0
+        blank_count = 0
+        return
+      }
+
+      if (is_figure_only_page()) {
+        detect_page_kind()
+        emit_page_note()
+        for (i = 1; i <= line_count; i++) {
+          line = trim(page_lines[i])
+          if (line ~ /^Figure [0-9-]+\./) {
+            print line
+            print ""
+          }
+        }
         line_count = 0
         blank_count = 0
         return
