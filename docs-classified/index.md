@@ -7,6 +7,7 @@ This folder is organized so an agent can answer HP 5004A usage, calibration, and
 ### HP 5004A Signature Analyzer Operating and Service Manual
 
 - File: `docs-classified/service/05004-90001.md`
+- Text Export: `docs-classified/service/05004-90001.txt`
 - Source PDF: `docs/05004-90001.pdf`
 - Category: `signature-analyzer-operating-service-manual`
 - Best for: operating instructions, signature-analysis setup, specification lookup, calibration guidance, circuit understanding, and repair/service context
